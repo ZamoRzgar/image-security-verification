@@ -297,117 +297,130 @@ export default function VerifyPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex items-center mb-8">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push("/dashboard")}
-          className="mr-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <h1 className="text-2xl font-bold">Verify Image</h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950 text-white relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -left-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-1/4 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
       </div>
       
-      <div className="bg-[#0f1218] p-6 rounded-lg mb-6">
-        <h2 className="text-xl font-medium mb-4">Select Image to Verify</h2>
-        <div 
-          className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center cursor-pointer hover:border-gray-500 transition-colors"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {file ? (
-            <div className="flex flex-col items-center">
-              <img 
-                src={URL.createObjectURL(file)} 
-                alt="Preview" 
-                className="max-h-48 max-w-full mb-4 rounded"
-              />
-              <p className="text-sm text-gray-400">{file.name} ({(file.size / 1024).toFixed(2)} KB)</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center">
-              <Upload className="h-12 w-12 text-gray-500 mb-2" />
-              <p className="text-gray-400 mb-1">Click to select an image or drag and drop</p>
-              <p className="text-sm text-gray-500">PNG, JPG, WEBP up to 10MB</p>
-            </div>
-          )}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept="image/*" 
-            className="hidden" 
-          />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        <div className="flex items-center mb-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/dashboard")}
+            className="mr-4 text-blue-100 hover:text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-indigo-200">Verify Image</h1>
         </div>
-      </div>
-      
-      {verificationResult && (
-        <div className={`bg-[#0f1218] p-6 rounded-lg mb-6 border-l-4 ${
-          verificationResult.isVerified ? "border-green-500" : "border-red-500"
-        }`}>
-          <div className="flex items-start">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
-              verificationResult.isVerified 
-                ? "bg-green-500/20" 
-                : "bg-red-500/20"
-            }`}>
-              {verificationResult.isVerified 
-                ? <ShieldCheck className="h-5 w-5 text-green-400" /> 
-                : <ShieldX className="h-5 w-5 text-red-400" />
-              }
-            </div>
-            <div>
-              <h3 className={`text-lg font-medium mb-1 ${
-                verificationResult.isVerified 
-                  ? "text-green-400" 
-                  : "text-red-400"
-              }`}>
-                {verificationResult.message}
-              </h3>
-              <p className="text-gray-400 mb-3">{verificationResult.details}</p>
-              
-              {verificationResult.ownerEmail && (
-                <div className="text-sm text-gray-400 mb-1">
-                  <span className="font-medium">Owner:</span> {verificationResult.ownerEmail}
+        
+        <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 mb-6 relative overflow-hidden">
+          <div className="absolute -right-20 -top-20 w-40 h-40 bg-blue-500/10 rounded-full blur-2xl" />
+          <div className="relative z-10">
+            <h2 className="text-xl font-medium mb-4 text-white">Select Image to Verify</h2>
+            <div 
+              className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center cursor-pointer hover:border-white/40 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {file ? (
+                <div className="flex flex-col items-center">
+                  <img 
+                    src={URL.createObjectURL(file)} 
+                    alt="Preview" 
+                    className="max-h-48 max-w-full mb-4 rounded shadow-lg"
+                  />
+                  <p className="text-sm text-blue-100">{file.name} ({(file.size / 1024).toFixed(2)} KB)</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <Upload className="h-12 w-12 text-blue-200/50 mb-2" />
+                  <p className="text-blue-100 mb-1">Click to select an image or drag and drop</p>
+                  <p className="text-sm text-blue-200/50">PNG, JPG, WEBP up to 10MB</p>
                 </div>
               )}
-              
-              {verificationResult.uploadDate && (
-                <div className="text-sm text-gray-400">
-                  <span className="font-medium">Uploaded:</span> {verificationResult.uploadDate}
-                </div>
-              )}
-              
-              {verificationResult.debugInfo && (
-                <div className="mt-4 p-3 bg-gray-800 rounded text-xs font-mono text-gray-300 whitespace-pre-wrap">
-                  {verificationResult.debugInfo}
-                </div>
-              )}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="hidden" 
+              />
             </div>
           </div>
         </div>
-      )}
-      
-      <div className="flex justify-center">
-        <Button
-          onClick={verifyImage}
-          disabled={!file || isVerifying}
-          className="w-full max-w-md bg-white text-black hover:bg-gray-200"
-        >
-          {isVerifying ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-              Verifying...
-            </>
-          ) : (
-            <>
-              <ShieldCheck className="h-5 w-5 mr-2" />
-              Verify Image
-            </>
-          )}
-        </Button>
+        
+        {verificationResult && (
+          <div className={`bg-white/5 backdrop-blur-md p-6 rounded-2xl mb-6 border border-white/10 relative overflow-hidden ${
+            verificationResult.isVerified ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
+          }`}>
+            <div className="absolute -left-20 -bottom-20 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl" />
+            <div className="flex items-start relative z-10">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
+                verificationResult.isVerified 
+                  ? "bg-green-500/20" 
+                  : "bg-red-500/20"
+              }`}>
+                {verificationResult.isVerified 
+                  ? <ShieldCheck className="h-5 w-5 text-green-300" /> 
+                  : <ShieldX className="h-5 w-5 text-red-300" />
+                }
+              </div>
+              <div>
+                <h3 className={`text-lg font-medium mb-1 ${
+                  verificationResult.isVerified 
+                    ? "text-green-300" 
+                    : "text-red-300"
+                }`}>
+                  {verificationResult.message}
+                </h3>
+                <p className="text-blue-100/80 mb-3">{verificationResult.details}</p>
+                
+                {verificationResult.ownerEmail && (
+                  <div className="text-sm text-blue-100/80 mb-1">
+                    <span className="font-medium">Owner:</span> {verificationResult.ownerEmail}
+                  </div>
+                )}
+                
+                {verificationResult.uploadDate && (
+                  <div className="text-sm text-blue-100/80">
+                    <span className="font-medium">Uploaded:</span> {verificationResult.uploadDate}
+                  </div>
+                )}
+                
+                {verificationResult.debugInfo && (
+                  <div className="mt-4 p-3 bg-white/5 backdrop-blur-sm rounded text-xs font-mono text-blue-100/70 whitespace-pre-wrap">
+                    {verificationResult.debugInfo}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className="flex justify-center">
+          <Button
+            onClick={verifyImage}
+            disabled={!file || isVerifying}
+            className="w-full max-w-md bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-indigo-500/30 border-0"
+          >
+            {isVerifying ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Verifying...
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="h-5 w-5 mr-2" />
+                Verify Image
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )

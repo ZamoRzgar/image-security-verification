@@ -258,112 +258,127 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex items-center mb-8">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push("/dashboard")}
-          className="mr-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <h1 className="text-2xl font-bold">Upload Image</h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950 text-white relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -left-40 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-1/4 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
       </div>
       
-      {isCheckingPublicKey ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mr-3"></div>
-          <p>Checking your public key...</p>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        <div className="flex items-center mb-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/dashboard")}
+            className="mr-4 text-blue-100 hover:text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-indigo-200">Upload Image</h1>
         </div>
-      ) : (
-        <>
-          <div className="bg-[#0f1218] p-6 rounded-lg mb-6">
-            <h2 className="text-xl font-medium mb-4">Select Image to Upload</h2>
-            <div 
-              className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center cursor-pointer hover:border-gray-500 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {file ? (
-                <div className="flex flex-col items-center">
-                  <img 
-                    src={URL.createObjectURL(file)} 
-                    alt="Preview" 
-                    className="max-h-48 max-w-full mb-4 rounded"
+        
+        {isCheckingPublicKey ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mr-3"></div>
+            <p className="text-blue-100">Checking your public key...</p>
+          </div>
+        ) : (
+          <>
+            <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 mb-6 relative overflow-hidden">
+              <div className="absolute -right-20 -top-20 w-40 h-40 bg-blue-500/10 rounded-full blur-2xl" />
+              <div className="relative z-10">
+                <h2 className="text-xl font-medium mb-4 text-white">Select Image to Upload</h2>
+                <div 
+                  className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center cursor-pointer hover:border-white/40 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {file ? (
+                    <div className="flex flex-col items-center">
+                      <img 
+                        src={URL.createObjectURL(file)} 
+                        alt="Preview" 
+                        className="max-h-48 max-w-full mb-4 rounded shadow-lg"
+                      />
+                      <p className="text-sm text-blue-100">{file.name} ({(file.size / 1024).toFixed(2)} KB)</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <Upload className="h-12 w-12 text-blue-200/50 mb-2" />
+                      <p className="text-blue-100 mb-1">Click to select an image or drag and drop</p>
+                      <p className="text-sm text-blue-200/50">PNG, JPG, WEBP up to 10MB</p>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept="image/*" 
+                    className="hidden" 
                   />
-                  <p className="text-sm text-gray-400">{file.name} ({(file.size / 1024).toFixed(2)} KB)</p>
                 </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <Upload className="h-12 w-12 text-gray-500 mb-2" />
-                  <p className="text-gray-400 mb-1">Click to select an image or drag and drop</p>
-                  <p className="text-sm text-gray-500">PNG, JPG, WEBP up to 10MB</p>
-                </div>
-              )}
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                accept="image/*" 
-                className="hidden" 
-              />
+              </div>
             </div>
-          </div>
-          
-          <div className="bg-[#0f1218] p-6 rounded-lg mb-6">
-            <h2 className="text-xl font-medium mb-4">Upload Private Key</h2>
-            <div 
-              className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center cursor-pointer hover:border-gray-500 transition-colors"
-              onClick={() => keyInputRef.current?.click()}
-            >
-              {privateKey ? (
-                <div className="flex flex-col items-center text-green-400">
-                  <CheckCircle className="h-12 w-12 mb-2" />
-                  <p className="mb-1">Private Key Loaded</p>
-                  <p className="text-sm text-gray-400">Ready to sign your image</p>
+            
+            <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 mb-6 relative overflow-hidden">
+              <div className="absolute -left-20 -bottom-20 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl" />
+              <div className="relative z-10">
+                <h2 className="text-xl font-medium mb-4 text-white">Upload Private Key</h2>
+                <div 
+                  className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center cursor-pointer hover:border-white/40 transition-colors"
+                  onClick={() => keyInputRef.current?.click()}
+                >
+                  {privateKey ? (
+                    <div className="flex flex-col items-center text-green-300">
+                      <CheckCircle className="h-12 w-12 mb-2" />
+                      <p className="mb-1">Private Key Loaded</p>
+                      <p className="text-sm text-blue-100">Ready to sign your image</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <FileKey className="h-12 w-12 text-blue-200/50 mb-2" />
+                      <p className="text-blue-100 mb-1">Click to upload your private key file</p>
+                      <p className="text-sm text-blue-200/50">JSON format</p>
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={keyInputRef} 
+                    onChange={handleKeyFileChange} 
+                    accept=".json" 
+                    className="hidden" 
+                  />
                 </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <FileKey className="h-12 w-12 text-gray-500 mb-2" />
-                  <p className="text-gray-400 mb-1">Click to upload your private key file</p>
-                  <p className="text-sm text-gray-500">JSON format</p>
-                </div>
-              )}
-              <input 
-                type="file" 
-                ref={keyInputRef} 
-                onChange={handleKeyFileChange} 
-                accept=".json" 
-                className="hidden" 
-              />
+                {privateKeyError && (
+                  <p className="text-red-300 mt-2 text-sm">{privateKeyError}</p>
+                )}
+              </div>
             </div>
-            {privateKeyError && (
-              <p className="text-red-400 mt-2 text-sm">{privateKeyError}</p>
-            )}
-          </div>
-          
-          <div className="flex justify-center">
-            <Button
-              onClick={handleUpload}
-              disabled={!file || !privateKey || isUploading}
-              className="w-full max-w-md bg-white text-black hover:bg-gray-200"
-            >
-              {isUploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-5 w-5 mr-2" />
-                  Upload and Sign
-                </>
-              )}
-            </Button>
-          </div>
-        </>
-      )}
+            
+            <div className="flex justify-center">
+              <Button
+                onClick={handleUpload}
+                disabled={!file || !privateKey || isUploading}
+                className="w-full max-w-md bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-indigo-500/30 border-0"
+              >
+                {isUploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-5 w-5 mr-2" />
+                    Upload and Sign
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
