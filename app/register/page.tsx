@@ -76,36 +76,18 @@ export default function RegisterPage() {
           // Save the public key to the user profile using server action
           await saveUserPublicKeyAction(authData.user.id, publicKey)
           
-          // Download private key as file - format it correctly for later use
-          const privateKeyData = { privateKey }
-          const blob = new Blob([JSON.stringify(privateKeyData)], { type: "application/json" })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement("a")
-          a.href = url
-          a.download = `private-key-${authData.user.id}.json`
-          document.body.appendChild(a)
-          a.click()
-          
-          // Small delay to ensure download starts before cleanup
-          setTimeout(() => {
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }, 100)
-          
           toast({
             title: "Registration successful",
-            description: "Your private key is being downloaded. Please keep it safe!",
+            description: "You can now log in to your account.",
           })
           
-          // Redirect to login page after a short delay to ensure download completes
-          setTimeout(() => {
-            router.push("/login")
-          }, 2000)
-        } catch (downloadError) {
-          console.error("Error downloading private key:", downloadError)
+          // Redirect to login page
+          router.push("/login")
+        } catch (error) {
+          console.error("Error saving public key:", error)
           toast({
-            title: "Registration successful but key download failed",
-            description: "Please contact support to reset your account.",
+            title: "Registration error",
+            description: "There was a problem completing your registration.",
             variant: "destructive",
           })
         }
@@ -183,8 +165,7 @@ export default function RegisterPage() {
             <p>By registering:</p>
             <ul className="list-disc pl-5 mt-1 space-y-1">
               <li>A unique RSA key pair will be generated for your account</li>
-              <li>Your private key will be downloaded to your device</li>
-              <li>Keep your private key secure - it cannot be recovered if lost</li>
+              <li>Keep your account credentials secure</li>
             </ul>
           </div>
 
