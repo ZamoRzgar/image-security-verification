@@ -100,4 +100,4 @@ npm start
 
 ## License
 
-[MIT](LICENSE)
+Boost Software License
