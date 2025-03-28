@@ -9,34 +9,61 @@
  */
 export async function generateRSAKeyPair(userEntropy?: string): Promise<CryptoKeyPair> {
   // Check if we're in a browser environment
-  const crypto = typeof window !== 'undefined' 
-    ? window.crypto 
-    : require('crypto').webcrypto;
+  const isServer = typeof window === 'undefined';
+  const crypto = isServer ? require('crypto').webcrypto : window.crypto;
   
   // Add additional entropy if provided
   if (userEntropy) {
-    // Create a buffer from the user entropy
-    const entropyBuffer = new TextEncoder().encode(userEntropy + Date.now().toString());
+    // Create a buffer from the user entropy with timestamp for additional randomness
+    const timestamp = Date.now();
+    const randomValue = isServer 
+      ? require('crypto').randomBytes(16).toString('hex') 
+      : Math.random().toString(36).substring(2, 15);
+    
+    const entropyString = `${userEntropy}-${timestamp}-${randomValue}`;
+    console.log(`Using entropy string: ${entropyString}`);
+    
+    const entropyBuffer = new TextEncoder().encode(entropyString);
     
     // In a real production environment, you would use this entropy to seed the PRNG
     // However, Web Crypto API doesn't allow direct seeding of the PRNG
     // This is a workaround to add some entropy to the key generation process
     
-    // We'll use the entropy to slightly modify the key generation parameters
-    // This is not cryptographically ideal but helps ensure different keys per user
+    // We'll use the entropy to modify the key generation parameters
     const hashBuffer = await crypto.subtle.digest('SHA-256', entropyBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     
-    // Use the first byte of the hash to slightly modify the modulus length
-    // This ensures different key parameters for different users
-    // Still keeping it within secure parameters (2048-2056)
-    const modulusAdjustment = hashArray[0] % 8; // Small adjustment (0-7)
+    // Use multiple bytes from the hash to modify key parameters
+    const modulusAdjustment = (hashArray[0] % 8) + 1; // Adjustment (1-8)
+    
+    // Create a unique public exponent based on user entropy
+    // Standard is 65537 (0x10001) represented as [1,0,1]
+    // We'll use a value close to this but unique per user
+    // The exponent must be odd and > 1 for security
+    let publicExponent;
+    
+    if (isServer) {
+      // In Node.js, we can use a more direct approach
+      const hash = require('crypto').createHash('sha256').update(entropyString).digest();
+      // Ensure the exponent is odd by setting the last bit to 1
+      const exponentValue = (65536 + (hash[0] % 64) * 2 + 1);
+      publicExponent = new Uint8Array([
+        (exponentValue >> 16) & 0xFF, 
+        (exponentValue >> 8) & 0xFF, 
+        exponentValue & 0xFF
+      ]);
+    } else {
+      // In browser, keep it simpler
+      publicExponent = new Uint8Array([1, 0, 1]);
+    }
+    
+    console.log(`Generating key with entropy: ${userEntropy} (modulus: ${2048 + modulusAdjustment}, exponent: ${Array.from(publicExponent).join(',')})`);
     
     return crypto.subtle.generateKey(
       {
         name: "RSA-PSS",
-        modulusLength: 2048 + modulusAdjustment, // Slight variation in modulus length
-        publicExponent: new Uint8Array([1, 0, 1]),
+        modulusLength: 2048 + modulusAdjustment, // Variation in modulus length
+        publicExponent: publicExponent,
         hash: "SHA-256",
       },
       true,
@@ -45,6 +72,8 @@ export async function generateRSAKeyPair(userEntropy?: string): Promise<CryptoKe
   }
   
   // Default key generation without additional entropy
+  // This should never be used in production - always provide user entropy
+  console.warn("Generating key WITHOUT user entropy - this should not happen in production!");
   return crypto.subtle.generateKey(
     {
       name: "RSA-PSS",
