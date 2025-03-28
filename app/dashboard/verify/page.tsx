@@ -75,28 +75,35 @@ export default function VerifyPage() {
         description: "You must be logged in to verify images.",
         variant: "destructive",
       })
+      router.push("/login")
       return
     }
     
     setIsVerifying(true)
     
     try {
+      // Log file details before hash calculation
+      console.log("Verifying file details:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: new Date(file.lastModified).toISOString()
+      })
+      
       // Calculate the hash of the uploaded image
       const fileHash = await calculateFileHash(file)
       console.log("File hash calculated:", fileHash)
       
-      // Search for images with matching hash in the database using server action
-      // Strict user boundary enforcement - only verify images belonging to the current user
-      const imageByHash = await findImageByHashAction(fileHash, currentUserId)
+      // Search for images with matching filename first to find the original image
+      // This approach allows us to detect if the hash has changed (indicating tampering)
+      const imageByName = await findImageByFileNameAction(file.name, currentUserId)
       
-      if (!imageByHash) {
-        console.log("No exact hash match found, trying filename")
-        // If no exact hash match, try to find by filename as a fallback
-        // Also enforce strict user boundaries
-        const imageByName = await findImageByFileNameAction(file.name, currentUserId)
+      if (!imageByName) {
+        // If no image found by filename, try hash as a fallback
+        const imageByHash = await findImageByHashAction(fileHash, currentUserId)
         
-        if (!imageByName) {
-          console.log("No image found by filename either")
+        if (!imageByHash) {
+          console.log("No image found by filename or hash")
           setVerificationResult({
             isVerified: false,
             message: "Verification Failed",
@@ -105,22 +112,61 @@ export default function VerifyPage() {
           return
         }
         
-        // Image found by filename but hash doesn't match
+        // Found by hash but not by name (unusual case - possibly renamed)
+        console.log("Image found by hash but not by filename")
+        
+        // Get the public key and verify the signature
+        const publicKeyString = await getUserPublicKeyAction(imageByHash.userId)
+        
+        if (!publicKeyString) {
+          console.error("Could not retrieve public key")
+          throw new Error("Could not retrieve public key for verification")
+        }
+        
+        // Import the public key
+        const publicKey = await importPublicKey(publicKeyString)
+        
+        // Verify the signature
+        const isValid = await verifyFileSignature(file, imageByHash.signature, publicKey)
+        
+        if (isValid) {
+          setVerificationResult({
+            isVerified: true,
+            message: "Image Verified Successfully",
+            details: "This image is authentic and has not been modified since it was signed, but it may have been renamed.",
+            uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
+          })
+        } else {
+          setVerificationResult({
+            isVerified: false,
+            message: "Signature Verification Failed",
+            details: "The image hash matches a registered image, but the cryptographic signature is invalid.",
+            uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
+          })
+        }
+        return
+      }
+      
+      // Image found by filename - now check if hash matches
+      if (imageByName.hash !== fileHash) {
         console.log("Image found by filename but hash doesn't match")
+        console.log("Calculated hash:", fileHash)
+        console.log("Stored hash:", imageByName.hash)
+        
         setVerificationResult({
           isVerified: false,
           message: "Image Has Been Modified",
-          details: "An image with this filename exists in your account, but its content has been modified.",
+          details: "An image with this filename exists in your account, but its content has been modified since it was originally signed.",
           uploadDate: new Date(imageByName.createdAt).toLocaleString(),
         })
         return
       }
       
-      // Image found with matching hash
-      console.log("Image found with matching hash:", imageByHash.id)
+      // Hash matches - now verify the cryptographic signature
+      console.log("Hash matches, verifying signature")
       
-      // Get the public key of the user who uploaded the image using server action
-      const publicKeyString = await getUserPublicKeyAction(imageByHash.userId)
+      // Get the public key
+      const publicKeyString = await getUserPublicKeyAction(imageByName.userId)
       
       if (!publicKeyString) {
         console.error("Could not retrieve public key")
@@ -128,16 +174,10 @@ export default function VerifyPage() {
       }
       
       // Import the public key
-      console.log("Importing public key")
       const publicKey = await importPublicKey(publicKeyString)
       
       // Verify the signature
-      console.log("Verifying signature")
-      const isValid = await verifyFileSignature(
-        file,
-        imageByHash.signature,
-        publicKey
-      )
+      const isValid = await verifyFileSignature(file, imageByName.signature, publicKey)
       
       if (isValid) {
         console.log("Signature verified successfully")
@@ -145,15 +185,15 @@ export default function VerifyPage() {
           isVerified: true,
           message: "Image Verified Successfully",
           details: "This image is authentic and has not been modified since it was signed.",
-          uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
+          uploadDate: new Date(imageByName.createdAt).toLocaleString(),
         })
       } else {
         console.log("Signature verification failed")
         setVerificationResult({
           isVerified: false,
           message: "Signature Verification Failed",
-          details: "The image hash matches but the signature verification failed. This could indicate tampering.",
-          uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
+          details: "The image appears unmodified based on its hash, but the cryptographic signature is invalid. This could indicate sophisticated tampering.",
+          uploadDate: new Date(imageByName.createdAt).toLocaleString(),
         })
       }
     } catch (error: any) {

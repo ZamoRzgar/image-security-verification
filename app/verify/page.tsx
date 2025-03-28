@@ -146,18 +146,16 @@ export default function VerifyPage() {
         console.warn("Error retrieving stored details:", error)
       }
       
-      // Search for images with matching hash in the database using server action
-      // Pass the current user ID to enforce strict user boundaries
-      const imageByHash = await findImageByHashAction(fileHash, currentUserId)
+      // Search for images with matching filename first to find the original image
+      // This approach allows us to detect if the hash has changed (indicating tampering)
+      const imageByName = await findImageByFileNameAction(file.name, currentUserId)
       
-      if (!imageByHash) {
-        console.log("No exact hash match found, trying filename")
-        // If no exact hash match, try to find by filename as a fallback
-        // Also pass the current user ID to enforce strict user boundaries
-        const imageByName = await findImageByFileNameAction(file.name, currentUserId)
+      if (!imageByName) {
+        // If no image found by filename, try hash as a fallback
+        const imageByHash = await findImageByHashAction(fileHash, currentUserId)
         
-        if (!imageByName) {
-          console.log("No image found by filename either")
+        if (!imageByHash) {
+          console.log("No image found by filename or hash")
           setVerificationResult({
             isVerified: false,
             message: "Image Not Found",
@@ -166,7 +164,43 @@ export default function VerifyPage() {
           return
         }
         
-        // Image found by filename but hash doesn't match
+        // Found by hash but not by name (unusual case - possibly renamed)
+        console.log("Image found by hash but not by filename")
+        
+        // Get the public key and verify the signature
+        const publicKeyString = await getUserPublicKeyAction(imageByHash.userId)
+        
+        if (!publicKeyString) {
+          console.error("Could not retrieve public key")
+          throw new Error("Could not retrieve public key for verification")
+        }
+        
+        // Import the public key
+        const publicKey = await importPublicKey(publicKeyString)
+        
+        // Verify the signature
+        const isValid = await verifyFileSignature(file, imageByHash.signature, publicKey)
+        
+        if (isValid) {
+          setVerificationResult({
+            isVerified: true,
+            message: "Image Verified Successfully",
+            details: "This image is authentic and has not been modified since it was signed, but it may have been renamed.",
+            uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
+          })
+        } else {
+          setVerificationResult({
+            isVerified: false,
+            message: "Signature Verification Failed",
+            details: "The image hash matches a registered image, but the cryptographic signature is invalid.",
+            uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
+          })
+        }
+        return
+      }
+      
+      // Image found by filename - now check if hash matches
+      if (imageByName.hash !== fileHash) {
         console.log("Image found by filename but hash doesn't match")
         console.log("Calculated hash:", fileHash)
         console.log("Stored hash:", imageByName.hash)
@@ -187,147 +221,47 @@ export default function VerifyPage() {
         `
         console.log(debugInfo)
         
-        // If hashes are similar, proceed with signature verification
-        if (hashesAreSimilar) {
-          console.log("Hashes are similar enough, proceeding with signature verification")
-          
-          try {
-            // Get the public key of the user who uploaded the image
-            const publicKeyString = await getUserPublicKeyAction(imageByName.userId)
-            
-            if (!publicKeyString) {
-              console.error("Could not retrieve public key")
-              setVerificationResult({
-                isVerified: false,
-                message: "Verification Error",
-                details: "Could not retrieve the public key for verification. The image exists but cannot be verified.",
-                ownerEmail: imageByName.ownerEmail,
-                uploadDate: new Date(imageByName.createdAt).toLocaleString(),
-                debugInfo: `${debugInfo}\nError: Public key not found for user ${imageByName.userId}`
-              })
-              return
-            }
-            
-            // Import the public key
-            console.log("Importing public key")
-            const publicKey = await importPublicKey(publicKeyString)
-            
-            // Verify the signature
-            console.log("Verifying signature")
-            const isValid = await verifyFileSignature(
-              file,
-              imageByName.signature,
-              publicKey
-            )
-            
-            if (isValid) {
-              console.log("Signature verified successfully despite hash difference")
-              setVerificationResult({
-                isVerified: true,
-                message: "Image Verified Successfully",
-                details: "This image is authentic and has not been significantly modified since it was signed.",
-                ownerEmail: imageByName.ownerEmail,
-                uploadDate: new Date(imageByName.createdAt).toLocaleString(),
-                debugInfo: hashesAreSimilar ? "Note: Minor differences detected but signature verified." : undefined
-              })
-              return
-            } else {
-              console.log("Signature verification failed")
-              setVerificationResult({
-                isVerified: false,
-                message: "Signature Verification Failed",
-                details: "The image was found but its signature verification failed. This could indicate tampering.",
-                ownerEmail: imageByName.ownerEmail,
-                uploadDate: new Date(imageByName.createdAt).toLocaleString(),
-                debugInfo
-              })
-              return
-            }
-          } catch (keyError: any) {
-            console.error("Error retrieving or using public key:", keyError)
-            setVerificationResult({
-              isVerified: false,
-              message: "Key Verification Error",
-              details: `Error retrieving or using public key: ${keyError.message}`,
-              ownerEmail: imageByName.ownerEmail,
-              uploadDate: new Date(imageByName.createdAt).toLocaleString(),
-              debugInfo: `${debugInfo}\nKey Error: ${keyError.message}`
-            })
-            return
-          }
-        }
-        
         setVerificationResult({
           isVerified: false,
           message: "Image Has Been Modified",
-          details: "An image with this filename exists in our system, but its content has been modified.",
-          ownerEmail: imageByName.ownerEmail,
+          details: "An image with this filename exists in your account, but its content has been modified since it was originally signed.",
           uploadDate: new Date(imageByName.createdAt).toLocaleString(),
-          debugInfo
         })
         return
       }
       
-      // Image found with matching hash
-      console.log("Image found with matching hash:", imageByHash.id)
+      // Hash matches - now verify the cryptographic signature
+      console.log("Hash matches, verifying signature")
       
-      try {
-        // Get the public key of the user who uploaded the image using server action
-        const publicKeyString = await getUserPublicKeyAction(imageByHash.userId)
-        
-        if (!publicKeyString) {
-          console.error("Could not retrieve public key")
-          setVerificationResult({
-            isVerified: false,
-            message: "Verification Error",
-            details: "Could not retrieve the public key for verification. The image exists but cannot be verified.",
-            ownerEmail: imageByHash.ownerEmail,
-            uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
-            debugInfo: `Error: Public key not found for user ${imageByHash.userId}`
-          })
-          return
-        }
-        
-        // Import the public key
-        console.log("Importing public key")
-        const publicKey = await importPublicKey(publicKeyString)
-        
-        // Verify the signature
-        console.log("Verifying signature")
-        const isValid = await verifyFileSignature(
-          file,
-          imageByHash.signature,
-          publicKey
-        )
-        
-        if (isValid) {
-          console.log("Signature verified successfully")
-          setVerificationResult({
-            isVerified: true,
-            message: "Image Verified Successfully",
-            details: "This image is authentic and has not been modified since it was signed.",
-            ownerEmail: imageByHash.ownerEmail,
-            uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
-          })
-        } else {
-          console.log("Signature verification failed")
-          setVerificationResult({
-            isVerified: false,
-            message: "Signature Verification Failed",
-            details: "The image hash matches but the signature verification failed. This could indicate tampering.",
-            ownerEmail: imageByHash.ownerEmail,
-            uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
-          })
-        }
-      } catch (keyError: any) {
-        console.error("Error retrieving or using public key:", keyError)
+      // Get the public key
+      const publicKeyString = await getUserPublicKeyAction(imageByName.userId)
+      
+      if (!publicKeyString) {
+        console.error("Could not retrieve public key")
+        throw new Error("Could not retrieve public key for verification")
+      }
+      
+      // Import the public key
+      const publicKey = await importPublicKey(publicKeyString)
+      
+      // Verify the signature
+      const isValid = await verifyFileSignature(file, imageByName.signature, publicKey)
+      
+      if (isValid) {
+        console.log("Signature verified successfully")
+        setVerificationResult({
+          isVerified: true,
+          message: "Image Verified Successfully",
+          details: "This image is authentic and has not been modified since it was signed.",
+          uploadDate: new Date(imageByName.createdAt).toLocaleString(),
+        })
+      } else {
+        console.log("Signature verification failed")
         setVerificationResult({
           isVerified: false,
-          message: "Key Verification Error",
-          details: `Error retrieving or using public key: ${keyError.message}`,
-          ownerEmail: imageByHash.ownerEmail,
-          uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
-          debugInfo: `Key Error: ${keyError.message}`
+          message: "Signature Verification Failed",
+          details: "The image appears unmodified based on its hash, but the cryptographic signature is invalid. This could indicate sophisticated tampering.",
+          uploadDate: new Date(imageByName.createdAt).toLocaleString(),
         })
       }
     } catch (error: any) {
