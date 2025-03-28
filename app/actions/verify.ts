@@ -17,26 +17,33 @@ interface ImageMetadata {
 
 /**
  * Server action to find an image by its hash
- * Uses service role client to bypass RLS policies
+ * Strictly enforces user boundaries - only finds images belonging to the specified user
  */
-export async function findImageByHashAction(hash: string): Promise<ImageMetadata | null> {
+export async function findImageByHashAction(hash: string, currentUserId: string): Promise<ImageMetadata | null> {
   try {
-    console.log("Server action: findImageByHashAction started", { hash });
+    console.log("Server action: findImageByHashAction started", { hash, currentUserId });
+    
+    // Require currentUserId - reject if not provided
+    if (!currentUserId) {
+      console.error("Server action: No user ID provided");
+      return null;
+    }
     
     // Use service role client to bypass RLS policies
     const serviceClient = createServiceRoleClient();
     
-    // Get the image data
+    // Always filter by user_id to enforce security boundaries
     const { data, error } = await serviceClient
       .from("images")
       .select("*")
       .eq("hash", hash)
+      .eq("user_id", currentUserId)
       .single();
     
     if (error) {
       if (error.code === "PGRST116") {
         // No rows returned
-        console.log("Server action: No image found with hash", hash);
+        console.log("Server action: No image found with hash", hash, "for user", currentUserId);
         return null;
       }
       console.error("Server action: Error finding image by hash", error);
@@ -79,28 +86,33 @@ export async function findImageByHashAction(hash: string): Promise<ImageMetadata
 
 /**
  * Server action to find an image by its filename
- * Uses service role client to bypass RLS policies
+ * Strictly enforces user boundaries - only finds images belonging to the specified user
  */
-export async function findImageByFileNameAction(fileName: string): Promise<ImageMetadata | null> {
+export async function findImageByFileNameAction(fileName: string, currentUserId: string): Promise<ImageMetadata | null> {
   try {
-    console.log("Server action: findImageByFileNameAction started", { fileName });
+    console.log("Server action: findImageByFileNameAction started", { fileName, currentUserId });
+    
+    // Require currentUserId - reject if not provided
+    if (!currentUserId) {
+      console.error("Server action: No user ID provided");
+      return null;
+    }
     
     // Use service role client to bypass RLS policies
     const serviceClient = createServiceRoleClient();
     
-    // Get the image data
+    // Always filter by user_id to enforce security boundaries
     const { data, error } = await serviceClient
       .from("images")
       .select("*")
       .eq("file_name", fileName)
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .eq("user_id", currentUserId)
       .single();
     
     if (error) {
       if (error.code === "PGRST116") {
         // No rows returned
-        console.log("Server action: No image found with filename", fileName);
+        console.log("Server action: No image found with filename", fileName, "for user", currentUserId);
         return null;
       }
       console.error("Server action: Error finding image by filename", error);

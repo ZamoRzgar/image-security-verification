@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useRef, ChangeEvent } from "react"
+import { useState, useRef, ChangeEvent, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowLeft, Upload, ShieldCheck, ShieldX } from "lucide-react"
+import { ArrowLeft, Upload, ShieldCheck, ShieldX, ImageIcon, RefreshCw } from "lucide-react"
 import { 
   calculateFileHash, 
   importPublicKey, 
@@ -15,6 +15,7 @@ import {
   findImageByFileNameAction,
   getUserPublicKeyAction
 } from "@/app/actions/verify"
+import { getCurrentUser } from "@/lib/supabase-utils"
 
 interface VerificationResult {
   isVerified: boolean
@@ -28,17 +29,54 @@ interface VerificationResult {
 export default function VerifyPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [imageLoadError, setImageLoadError] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+
+  // Get the current user ID when the component mounts
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (user) {
+          setCurrentUserId(user.id)
+          setIsAuthenticated(true)
+          console.log("Current user ID:", user.id)
+        } else {
+          setIsAuthenticated(false)
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error)
+        setIsAuthenticated(false)
+      }
+    }
+    
+    fetchCurrentUser()
+  }, [])
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
-      // Reset verification result when a new file is selected
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      // Reset image error state when a new file is selected
+      setImageLoadError(false)
+      // Clear previous verification result
       setVerificationResult(null)
     }
+  }
+
+  const handleImageError = () => {
+    console.error("Failed to load image preview for file:", file?.name)
+    setImageLoadError(true)
+  }
+
+  const retryLoadImage = () => {
+    // Reset error state to trigger a reload
+    setImageLoadError(false)
   }
 
   // Function to check if two hashes are similar (allowing for minor differences)
@@ -70,6 +108,17 @@ export default function VerifyPage() {
       return
     }
     
+    // Ensure user is logged in
+    if (!currentUserId) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to verify images.",
+        variant: "destructive",
+      })
+      router.push("/login")
+      return
+    }
+    
     setIsVerifying(true)
     
     try {
@@ -98,12 +147,14 @@ export default function VerifyPage() {
       }
       
       // Search for images with matching hash in the database using server action
-      const imageByHash = await findImageByHashAction(fileHash)
+      // Pass the current user ID to enforce strict user boundaries
+      const imageByHash = await findImageByHashAction(fileHash, currentUserId)
       
       if (!imageByHash) {
         console.log("No exact hash match found, trying filename")
         // If no exact hash match, try to find by filename as a fallback
-        const imageByName = await findImageByFileNameAction(file.name)
+        // Also pass the current user ID to enforce strict user boundaries
+        const imageByName = await findImageByFileNameAction(file.name, currentUserId)
         
         if (!imageByName) {
           console.log("No image found by filename either")
@@ -329,11 +380,31 @@ export default function VerifyPage() {
             >
               {file ? (
                 <div className="flex flex-col items-center">
-                  <img 
-                    src={URL.createObjectURL(file)} 
-                    alt="Preview" 
-                    className="max-h-48 max-w-full mb-4 rounded shadow-lg"
-                  />
+                  {imageLoadError ? (
+                    <div className="flex flex-col items-center justify-center bg-slate-800/50 p-4 rounded mb-4 w-full max-w-xs h-48">
+                      <ImageIcon className="h-12 w-12 text-blue-400/50 mb-2" />
+                      <p className="text-sm text-center text-blue-200/70 mb-2">Failed to load image preview</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          retryLoadImage();
+                        }}
+                        className="border-white/20 text-blue-100 hover:text-white hover:bg-white/10"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Retry
+                      </Button>
+                    </div>
+                  ) : (
+                    <img 
+                      src={URL.createObjectURL(file)} 
+                      alt="Preview" 
+                      className="max-h-48 max-w-full mb-4 rounded shadow-lg"
+                      onError={handleImageError}
+                    />
+                  )}
                   <p className="text-sm text-blue-100">{file.name} ({(file.size / 1024).toFixed(2)} KB)</p>
                 </div>
               ) : (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, ChangeEvent } from "react"
+import { useState, useRef, ChangeEvent, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -15,12 +15,12 @@ import {
   findImageByFileNameAction,
   getUserPublicKeyAction
 } from "@/app/actions/verify"
+import { getCurrentUser } from "@/lib/supabase-utils"
 
 interface VerificationResult {
   isVerified: boolean
   message: string
   details?: string
-  ownerEmail?: string
   uploadDate?: string
 }
 
@@ -30,7 +30,25 @@ export default function VerifyPage() {
   const [file, setFile] = useState<File | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Get the current user ID when the component mounts
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (user) {
+          setCurrentUserId(user.id)
+          console.log("Current user ID:", user.id)
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error)
+      }
+    }
+    
+    fetchCurrentUser()
+  }, [])
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -50,6 +68,16 @@ export default function VerifyPage() {
       return
     }
     
+    // Ensure user is logged in
+    if (!currentUserId) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to verify images.",
+        variant: "destructive",
+      })
+      return
+    }
+    
     setIsVerifying(true)
     
     try {
@@ -58,19 +86,21 @@ export default function VerifyPage() {
       console.log("File hash calculated:", fileHash)
       
       // Search for images with matching hash in the database using server action
-      const imageByHash = await findImageByHashAction(fileHash)
+      // Strict user boundary enforcement - only verify images belonging to the current user
+      const imageByHash = await findImageByHashAction(fileHash, currentUserId)
       
       if (!imageByHash) {
         console.log("No exact hash match found, trying filename")
         // If no exact hash match, try to find by filename as a fallback
-        const imageByName = await findImageByFileNameAction(file.name)
+        // Also enforce strict user boundaries
+        const imageByName = await findImageByFileNameAction(file.name, currentUserId)
         
         if (!imageByName) {
           console.log("No image found by filename either")
           setVerificationResult({
             isVerified: false,
-            message: "Image Not Found",
-            details: "This image has not been registered in our system.",
+            message: "Verification Failed",
+            details: "This image could not be verified. It may not be registered in your account.",
           })
           return
         }
@@ -80,8 +110,7 @@ export default function VerifyPage() {
         setVerificationResult({
           isVerified: false,
           message: "Image Has Been Modified",
-          details: "An image with this filename exists in our system, but its content has been modified.",
-          ownerEmail: imageByName.ownerEmail,
+          details: "An image with this filename exists in your account, but its content has been modified.",
           uploadDate: new Date(imageByName.createdAt).toLocaleString(),
         })
         return
@@ -116,7 +145,6 @@ export default function VerifyPage() {
           isVerified: true,
           message: "Image Verified Successfully",
           details: "This image is authentic and has not been modified since it was signed.",
-          ownerEmail: imageByHash.ownerEmail,
           uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
         })
       } else {
@@ -125,7 +153,6 @@ export default function VerifyPage() {
           isVerified: false,
           message: "Signature Verification Failed",
           details: "The image hash matches but the signature verification failed. This could indicate tampering.",
-          ownerEmail: imageByHash.ownerEmail,
           uploadDate: new Date(imageByHash.createdAt).toLocaleString(),
         })
       }
@@ -194,43 +221,33 @@ export default function VerifyPage() {
       </div>
       
       {verificationResult && (
-        <div className={`bg-[#0f1218] p-6 rounded-lg mb-6 border-l-4 ${
-          verificationResult.isVerified ? "border-green-500" : "border-red-500"
-        }`}>
-          <div className="flex items-start">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
-              verificationResult.isVerified ? "bg-green-500/20" : "bg-red-500/20"
+        <div className="bg-slate-800/70 p-6 rounded-xl border border-white/10 backdrop-blur-md">
+          <div className="flex items-center mb-4">
+            {verificationResult.isVerified ? (
+              <div className="bg-green-500/20 p-3 rounded-full mr-4">
+                <ShieldCheck className="h-8 w-8 text-green-400" />
+              </div>
+            ) : (
+              <div className="bg-red-500/20 p-3 rounded-full mr-4">
+                <ShieldX className="h-8 w-8 text-red-400" />
+              </div>
+            )}
+            <h2 className={`text-xl font-semibold ${
+              verificationResult.isVerified ? 'text-green-400' : 'text-red-400'
             }`}>
-              {verificationResult.isVerified ? (
-                <ShieldCheck className="h-5 w-5 text-green-500" />
-              ) : (
-                <ShieldX className="h-5 w-5 text-red-500" />
-              )}
-            </div>
-            <div>
-              <h2 className={`text-xl font-medium mb-2 ${
-                verificationResult.isVerified ? "text-green-500" : "text-red-500"
-              }`}>
-                {verificationResult.message}
-              </h2>
-              <p className="text-gray-400 mb-4">{verificationResult.details}</p>
-              
-              {verificationResult.ownerEmail && (
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-500">Owner</p>
-                    <p className="text-white">{verificationResult.ownerEmail}</p>
-                  </div>
-                  {verificationResult.uploadDate && (
-                    <div>
-                      <p className="text-gray-500">Upload Date</p>
-                      <p className="text-white">{verificationResult.uploadDate}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+              {verificationResult.message}
+            </h2>
           </div>
+          <p className="text-gray-400 mb-4">{verificationResult.details}</p>
+          
+          {verificationResult.uploadDate && (
+            <div className="grid grid-cols-1 gap-4 text-sm">
+              <div>
+                <p className="text-gray-500">Upload Date</p>
+                <p className="text-white">{verificationResult.uploadDate}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
       

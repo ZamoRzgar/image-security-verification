@@ -4,7 +4,7 @@ import { useState, useRef, ChangeEvent, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowLeft, Upload, FileKey, CheckCircle } from "lucide-react"
+import { ArrowLeft, Upload, FileKey, CheckCircle, ImageIcon, RefreshCw } from "lucide-react"
 import { 
   importPrivateKey, 
   calculateFileHash, 
@@ -28,6 +28,7 @@ export default function UploadPage() {
   const [privateKeyError, setPrivateKeyError] = useState("")
   const [isCheckingPublicKey, setIsCheckingPublicKey] = useState(true)
   const [publicKeyExists, setPublicKeyExists] = useState(false)
+  const [imageLoadError, setImageLoadError] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const keyInputRef = useRef<HTMLInputElement>(null)
 
@@ -89,8 +90,72 @@ export default function UploadPage() {
   }, [toast])
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      // Validate file type
+      if (!selectedFile.type.startsWith('image/')) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select an image file (JPEG, PNG, etc.).",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Validate file size (10MB max)
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 10MB.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      setFile(selectedFile)
+      // Reset image error state when a new file is selected
+      setImageLoadError(false)
+    }
+  }
+
+  const handleImageError = () => {
+    console.error("Failed to load image preview for file:", file?.name)
+    setImageLoadError(true)
+    
+    // Log detailed error context
+    const errorContext = {
+      fileName: file?.name,
+      fileSize: file?.size,
+      fileType: file?.type,
+      timestamp: new Date().toISOString()
+    }
+    console.error("Image preview error context:", errorContext)
+    
+    toast({
+      title: "Image Preview Failed",
+      description: "Failed to generate preview for the selected image. The file might be corrupted.",
+      variant: "destructive",
+    })
+  }
+
+  const retryLoadImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Reset error state to trigger a reload
+    setImageLoadError(false)
+    
+    // Force a re-render of the image by creating a new object URL
+    if (file) {
+      const newObjectUrl = URL.createObjectURL(file)
+      const imgElement = document.createElement('img')
+      imgElement.src = newObjectUrl
+      imgElement.onload = () => {
+        console.log("Image preview reload successful")
+        setImageLoadError(false)
+      }
+      imgElement.onerror = () => {
+        console.error("Image preview reload failed")
+        setImageLoadError(true)
+      }
     }
   }
 
@@ -297,11 +362,28 @@ export default function UploadPage() {
                 >
                   {file ? (
                     <div className="flex flex-col items-center">
-                      <img 
-                        src={URL.createObjectURL(file)} 
-                        alt="Preview" 
-                        className="max-h-48 max-w-full mb-4 rounded shadow-lg"
-                      />
+                      {imageLoadError ? (
+                        <div className="flex flex-col items-center justify-center bg-slate-800/50 p-4 rounded mb-4 w-full max-w-xs h-48">
+                          <ImageIcon className="h-12 w-12 text-blue-400/50 mb-2" />
+                          <p className="text-sm text-center text-blue-200/70 mb-2">Failed to load image preview</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={retryLoadImage}
+                            className="border-white/20 text-blue-100 hover:text-white hover:bg-white/10"
+                          >
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Retry
+                          </Button>
+                        </div>
+                      ) : (
+                        <img 
+                          src={URL.createObjectURL(file)} 
+                          alt="Preview" 
+                          className="max-h-48 max-w-full mb-4 rounded shadow-lg"
+                          onError={handleImageError}
+                        />
+                      )}
                       <p className="text-sm text-blue-100">{file.name} ({(file.size / 1024).toFixed(2)} KB)</p>
                     </div>
                   ) : (
