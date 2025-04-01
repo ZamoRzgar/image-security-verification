@@ -1,14 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, AlertCircle } from "lucide-react"
+import { ArrowLeft, AlertCircle, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { debugUserProfile } from "@/app/actions/debug"
 import { regenerateKeysAction } from "@/app/actions/regenerate-keys"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { checkAdminStatusAction } from "@/app/actions/admin"
 
 export default function DebugPage() {
   const router = useRouter()
@@ -17,6 +18,41 @@ export default function DebugPage() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [debugResult, setDebugResult] = useState<any>(null)
   const [privateKey, setPrivateKey] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true)
+
+  // Check if current user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const isUserAdmin = await checkAdminStatusAction()
+        
+        if (!isUserAdmin) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to access this page.",
+            variant: "destructive",
+          })
+          router.push("/dashboard")
+          return
+        }
+        
+        setIsAdmin(true)
+      } catch (error) {
+        console.error("Error checking admin status:", error)
+        toast({
+          title: "Error",
+          description: "Failed to verify admin privileges.",
+          variant: "destructive",
+        })
+        router.push("/dashboard")
+      } finally {
+        setIsCheckingAdmin(false)
+      }
+    }
+    
+    checkAdminStatus()
+  }, [router, toast])
 
   const handleDebug = async () => {
     setIsLoading(true)
@@ -123,6 +159,30 @@ export default function DebugPage() {
         variant: "destructive",
       })
     }
+  }
+
+  // Show loading state while checking admin status
+  if (isCheckingAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">Checking Permissions</CardTitle>
+            <CardDescription className="text-center">
+              Verifying your admin privileges...
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center py-6">
+            <RefreshCw className="h-10 w-10 animate-spin text-blue-500" />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Redirect non-admin users
+  if (!isAdmin) {
+    return null
   }
 
   return (

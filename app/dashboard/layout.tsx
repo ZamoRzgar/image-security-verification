@@ -78,6 +78,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       href: "/dashboard/admin",
       icon: <Shield className="h-5 w-5" />,
     },
+    // Add a debug section for admins only
+    {
+      name: "Debug",
+      href: "/dashboard/debug",
+      icon: <User className="h-5 w-5" />,
+    },
   ]
 
   const toggleMobileMenu = () => {
@@ -103,6 +109,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
 
       {/* Sidebar for desktop */}
+      {!isAdmin ? null : (
       <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
         <div className="flex flex-col flex-grow border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-y-auto">
           <div className="flex items-center h-16 flex-shrink-0 px-4 border-b border-slate-200 dark:border-slate-800">
@@ -179,6 +186,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </div>
       </div>
+      )}
 
       {/* Mobile sidebar */}
       {isMobileMenuOpen && (
@@ -190,6 +198,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           ></div>
           
           {/* Sidebar */}
+          {!isAdmin ? null : (
           <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white dark:bg-slate-950">
             <div className="flex items-center h-16 flex-shrink-0 px-4 border-b border-slate-200 dark:border-slate-800">
               <Link href="/dashboard" className="flex items-center" onClick={toggleMobileMenu}>
@@ -266,11 +275,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
 
       {/* Main content */}
-      <div className="lg:pl-64 flex flex-col flex-1">
+      <div className={`${isAdmin ? "lg:pl-64" : ""} flex flex-col flex-1`}>
         <main className="flex-1 pb-8">
           {children}
         </main>

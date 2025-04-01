@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { Users, UserCog, Shield, Search, RefreshCw, UserX, UserCheck } from "lucide-react"
-import { getAllUsersAction, updateUserRoleAction } from "@/app/actions/admin"
+import { getAllUsersAction, updateUserRoleAction, checkAdminStatusAction } from "@/app/actions/admin"
 import { getCurrentUser } from "@/lib/supabase-utils"
 import { formatDate } from "@/lib/crypto-utils"
 
@@ -38,21 +38,9 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
-        const user = await getCurrentUser()
-        if (!user) {
-          toast({
-            title: "Authentication Required",
-            description: "You must be logged in to access this page.",
-            variant: "destructive",
-          })
-          router.push("/login")
-          return
-        }
-
-        // Get user role from profile
-        const { data: profile } = await fetch(`/api/users/${user.id}/profile`).then(res => res.json())
+        const isUserAdmin = await checkAdminStatusAction()
         
-        if (profile?.role !== "admin") {
+        if (!isUserAdmin) {
           toast({
             title: "Access Denied",
             description: "You don't have permission to access the admin dashboard.",
